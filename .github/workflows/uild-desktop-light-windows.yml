@@ -1,0 +1,252 @@
+
+name: Build Hermes Desktop Light (Windows x64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Git branch, tag, or commit SHA to build (e.g. main, v0.22.5, or full SHA)"
+        required: true
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-light-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build remote-only Windows x64 portable app
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve exact source commit
+        id: source
+        shell: pwsh
+        run: |
+          $sha = (git rev-parse HEAD).Trim()
+
+          if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') {
+            throw "Could not resolve checkout to a full commit SHA."
+          }
+
+          "sha=$sha" >> $env:GITHUB_OUTPUT
+          "Requested ref: ${{ inputs.source_ref }}" | Write-Host
+          "Resolved commit: $sha" | Write-Host
+
+      - name: Verify Windows x64 runner
+        shell: pwsh
+        run: |
+          if ([Environment]::Is64BitOperatingSystem -ne $true) {
+            throw "A 64-bit Windows runner is required."
+          }
+
+          if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
+            throw "Expected AMD64 runner, got $env:PROCESSOR_ARCHITECTURE"
+          }
+
+          Write-Host "Windows x64 runner verified."
+          git status --short
+
+      - name: Set up bootstrap Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show build tool versions
+        shell: pwsh
+        run: |
+          python --version
+          git --version
+          node --version
+          npm --version
+
+      - name: Build Hermes Desktop Light
+        shell: pwsh
+        env:
+          CI: "true"
+          PYTHONUTF8: "1"
+        run: |
+          $sha = "${{ steps.source.outputs.sha }}"
+
+          # Commit mode avoids stable-release claim/tag validation.
+          # --dir requests an unpacked Electron application, not an MSIX.
+          python scripts/bundles/desktop.py `
+            --commit $sha `
+            --variant light `
+            --clean `
+            -- `
+            --dir `
+            --x64
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Hermes Desktop Light build failed."
+          }
+
+      - name: Verify unpacked application
+        shell: pwsh
+        run: |
+          $appDir = Join-Path $PWD "apps/desktop/release/win-unpacked"
+
+          if (!(Test-Path $appDir -PathType Container)) {
+            throw "Expected unpacked app directory not found: $appDir"
+          }
+
+          $exeFiles = @(Get-ChildItem $appDir -Filter "*.exe" -File)
+
+          if ($exeFiles.Count -eq 0) {
+            throw "No executable found in the unpacked application."
+          }
+
+          $asar = Join-Path $appDir "resources/app.asar"
+          if (!(Test-Path $asar -PathType Leaf)) {
+            throw "resources/app.asar is missing."
+          }
+
+          Write-Host "Application directory: $appDir"
+          Write-Host "Executables:"
+          $exeFiles | ForEach-Object { Write-Host " - $($_.Name)" }
+
+          # Light must not contain the bundled local Agent payload.
+          $agentPayload = Join-Path $appDir "resources/agent-payload"
+          if (Test-Path $agentPayload) {
+            throw "Agent payload found in Light build."
+          }
+
+          # Check the complete unpacked tree for common Python runtime files.
+          $pythonFiles = @(
+            Get-ChildItem $appDir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+              $_.Name -match '^(python|pythonw)([0-9.]*)?\.exe$'
+            }
+          )
+
+          if ($pythonFiles.Count -gt 0) {
+            $pythonFiles | ForEach-Object {
+              Write-Host "Unexpected Python runtime: $($_.FullName)"
+            }
+            throw "Python runtime executable found in Light build."
+          }
+
+          # Also reject a separately staged agent payload directory anywhere.
+          $payloadDirs = @(
+            Get-ChildItem $appDir -Recurse -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq "agent-payload" }
+          )
+
+          if ($payloadDirs.Count -gt 0) {
+            throw "An agent-payload directory was found."
+          }
+
+          Write-Host "PASS: unpacked app exists."
+          Write-Host "PASS: Electron app.asar exists."
+          Write-Host "PASS: no agent-payload directory."
+          Write-Host "PASS: no python.exe/pythonw.exe runtime."
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $appDir = Join-Path $PWD "apps/desktop/release/win-unpacked"
+          $outDir = Join-Path $PWD "artifacts"
+          $zipPath = Join-Path $outDir "Hermes-Desktop-Light-Windows-x64.zip"
+
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          Compress-Archive `
+            -Path (Join-Path $appDir "*") `
+            -DestinationPath $zipPath `
+            -CompressionLevel Optimal `
+            -Force
+
+          if (!(Test-Path $zipPath -PathType Leaf)) {
+            throw "Portable ZIP was not created."
+          }
+
+          $zip = Get-Item $zipPath
+          Write-Host "Created: $($zip.FullName)"
+          Write-Host "Size: $([math]::Round($zip.Length / 1MB, 2)) MB"
+
+      - name: Verify portable ZIP contents
+        shell: pwsh
+        run: |
+          $zipPath = Join-Path $PWD "artifacts/Hermes-Desktop-Light-Windows-x64.zip"
+          $tempDir = Join-Path $env:RUNNER_TEMP "hermes-light-zip-check"
+
+          Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
+
+          $exeFiles = @(
+            Get-ChildItem $tempDir -Filter "*.exe" -File -Recurse
+          )
+
+          if ($exeFiles.Count -eq 0) {
+            throw "ZIP does not contain an executable."
+          }
+
+          if (!(Test-Path (Join-Path $tempDir "resources/app.asar"))) {
+            throw "ZIP is missing resources/app.asar."
+          }
+
+          $agentPayload = @(
+            Get-ChildItem $tempDir -Directory -Recurse |
+            Where-Object { $_.Name -eq "agent-payload" }
+          )
+
+          if ($agentPayload.Count -gt 0) {
+            throw "ZIP contains an agent-payload directory."
+          }
+
+          $pythonFiles = @(
+            Get-ChildItem $tempDir -File -Recurse |
+            Where-Object {
+              $_.Name -match '^(python|pythonw)([0-9.]*)?\.exe$'
+            }
+          )
+
+          if ($pythonFiles.Count -gt 0) {
+            throw "ZIP contains a Python runtime executable."
+          }
+
+          Write-Host "PASS: ZIP can be extracted."
+          Write-Host "PASS: executable found."
+          Write-Host "PASS: app.asar found."
+          Write-Host "PASS: no local Agent payload."
+          Write-Host "PASS: no Python runtime executable."
+
+      - name: Write build metadata
+        shell: pwsh
+        run: |
+          $metadata = [ordered]@{
+            product = "Hermes Desktop Light"
+            variant = "light"
+            platform = "win32"
+            architecture = "x64"
+            requested_ref = "${{ inputs.source_ref }}"
+            commit = "${{ steps.source.outputs.sha }}"
+            local_agent_included = $false
+            python_runtime_included = $false
+            packaging = "electron-builder dir"
+          }
+
+          $metadata |
+            ConvertTo-Json -Depth 5 |
+            Set-Content "artifacts/build-info.json" -Encoding utf8
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-Desktop-Light-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 30
