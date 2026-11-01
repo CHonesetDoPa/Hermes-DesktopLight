@@ -64,19 +64,6 @@ No MSIX installation is required.
 - A successful CI build does not by itself prove that the application never attempts to install a local runtime. First-launch behavior should be tested on a clean Windows machine.
 - Compatibility depends on the selected upstream source version.
 
-### Build failed
-
-Open the failed GitHub Actions run and inspect the step that reported the error.
-
-When reporting an issue, include:
-
-- The source branch or tag.
-- The source commit SHA.
-- The GitHub Actions run URL.
-- The error message.
-
-Do not include private Gateway credentials or access tokens.
-
 ## License and upstream project
 
 Hermes Desktop Light is built from the official Hermes Agent project.
