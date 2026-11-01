@@ -3,6 +3,8 @@
 
 **轻量级 Windows 便携桌面客户端，连接部署在远程服务器上的 Hermes Agent。**
 
+[![Build Light](https://github.com/CHonesetDoPa/Hermes-DesktopLight/actions/workflows/uild-desktop-light-windows.yml/badge.svg)](https://github.com/CHonesetDoPa/Hermes-DesktopLight/actions/workflows/uild-desktop-light-windows.yml)
+
 Hermes Desktop Light 是基于官方 [NousResearch Hermes Agent](https://github.com/NousResearch/hermes-agent) 项目构建的非官方 Windows x64 社区版本。
 
 本项目面向已经在 Ubuntu、Linux VPS 或其他远程服务器上部署 Hermes Agent 的用户。Windows 电脑只负责运行桌面 GUI 客户端，Hermes Agent 和 Gateway 则运行在远程服务器上。
