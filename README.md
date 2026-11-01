@@ -3,6 +3,8 @@
 
 **A lightweight Windows portable desktop client for connecting to a remote Hermes Agent.**
 
+[![Build Light](https://github.com/CHonesetDoPa/Hermes-DesktopLight/actions/workflows/uild-desktop-light-windows.yml/badge.svg)](https://github.com/CHonesetDoPa/Hermes-DesktopLight/actions/workflows/uild-desktop-light-windows.yml)
+
 Hermes Desktop Light is an unofficial community-built Windows x64 desktop package based on the official [NousResearch Hermes Agent](https://github.com/NousResearch/hermes-agent) project.
 
 It is designed for users who already run Hermes Agent on a remote Linux server or VPS. The Windows computer acts as a desktop client, while the Hermes Agent and Gateway run on the remote server.
