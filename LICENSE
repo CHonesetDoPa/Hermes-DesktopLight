@@ -1,0 +1,32 @@
+CC0 1.0 Universal
+
+The original GitHub Actions workflows, CI configuration, and build automation
+scripts in this repository are dedicated to the public domain under
+CC0 1.0 Universal.
+
+To the extent possible under law, the contributors have waived all copyright
+and related or neighboring rights to these original works.
+
+Full license:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+---
+
+Upstream Software Notice
+
+Hermes Desktop Light is built using source code from:
+
+https://github.com/NousResearch/hermes-agent
+
+The upstream Hermes Agent project is licensed under the MIT License.
+
+Copyright (c) 2025 Nous Research
+
+The upstream source code and its associated components remain subject to
+their original licenses and copyright notices.
+
+This repository does not relicense, replace, or override the upstream
+Hermes Agent license.
+
+Third-party dependencies and bundled components remain subject to
+their respective licenses.
