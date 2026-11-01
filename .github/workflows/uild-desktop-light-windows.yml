@@ -182,5 +182,5 @@ jobs:
           body_path: release-notes.md
           files: Hermes-DesktopLight-Windows-x64.zip
           draft: false
-          prerelease: true
+          prerelease: false
           fail_on_unmatched_files: true
