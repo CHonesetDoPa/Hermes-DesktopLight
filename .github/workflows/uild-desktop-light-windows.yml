@@ -80,12 +80,12 @@ jobs:
             --variant=light
 
       # Package the already-built Light desktop as an unpacked app.
-      # npm run pack uses electron-builder's --dir mode, not an installer.
+      # pnpm run pack uses electron-builder's --dir mode, not an installer.
       - name: Package unpacked Windows application
         shell: pwsh
         working-directory: hermes-source
         run: |
-          npm run pack --workspace apps/desktop
+          pnpm --filter hermes run pack
 
       - name: Locate and validate portable application
         id: app
